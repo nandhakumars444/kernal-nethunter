@@ -1,0 +1,35 @@
+name: Build NetHunter Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y gcc-aarch64-linux-gnu \
+        gcc-arm-linux-gnueabi make bc \
+        bison flex libssl-dev libelf-dev \
+        zip git python3
+    
+    - name: Build Kernel
+      run: |
+        export ARCH=arm64
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        make ARCH=arm64 \
+        CROSS_COMPILE=aarch64-linux-gnu- \
+        potter_defconfig
+        make ARCH=arm64 \
+        CROSS_COMPILE=aarch64-linux-gnu- \
+        -j$(nproc)
+    
+    - name: Upload Kernel
+      uses: actions/upload-artifact@v3
+      with:
+        name: kernel
+        path: arch/arm64/boot/Image.gz-dtb
