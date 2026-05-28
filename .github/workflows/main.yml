@@ -7,29 +7,44 @@ jobs:
   build:
     runs-on: ubuntu-20.04
     steps:
-    - uses: actions/checkout@v3
-    
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 1
+
     - name: Install Dependencies
       run: |
-        sudo apt update
-        sudo apt install -y gcc-aarch64-linux-gnu \
-        gcc-arm-linux-gnueabi make bc \
-        bison flex libssl-dev libelf-dev \
-        zip git python3
-    
+        sudo apt-get update -y
+        sudo apt-get install -y \
+        gcc-aarch64-linux-gnu \
+        gcc-arm-linux-gnueabi \
+        make bc bison flex \
+        libssl-dev libelf-dev \
+        build-essential python3 zip
+
     - name: Build Kernel
       run: |
         export ARCH=arm64
         export CROSS_COMPILE=aarch64-linux-gnu-
+        export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
         make ARCH=arm64 \
         CROSS_COMPILE=aarch64-linux-gnu- \
         potter_defconfig
         make ARCH=arm64 \
         CROSS_COMPILE=aarch64-linux-gnu- \
-        -j$(nproc)
-    
-    - name: Upload Kernel
+        -j$(nproc) 2>&1 | tail -20
+
+    - name: Package Kernel
+      run: |
+        git clone --depth=1 \
+        https://github.com/osm0sis/AnyKernel3 ak3
+        cp arch/arm64/boot/Image.gz-dtb ak3/
+        cd ak3
+        zip -r9 ../NetHunter-Potter.zip * \
+        -x .git README.md
+
+    - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: kernel
-        path: arch/arm64/boot/Image.gz-dtb
+        name: NetHunter-Potter-Kernel
+        path: NetHunter-Potter.zip
