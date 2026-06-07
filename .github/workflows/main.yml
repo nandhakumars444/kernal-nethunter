@@ -27,21 +27,20 @@ jobs:
         run: |
           export ARCH=arm
           export CROSS_COMPILE=arm-linux-gnueabi-
-          make ARCH=arm \
-            CROSS_COMPILE=arm-linux-gnueabi- \
-            potter_defconfig
-          make ARCH=arm \
-            CROSS_COMPILE=arm-linux-gnueabi- \
-            -j$(nproc) 2>&1 | tail -20
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- potter_defconfig
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- -j$(nproc)
+
+      - name: Check Output
+        run: |
+          echo "Listing boot output:"
+          ls arch/arm/boot/ || echo "Boot folder missing!"
 
       - name: Package Kernel
         run: |
-          git clone --depth=1 \
-            https://github.com/osm0sis/AnyKernel3 ak3
-          cp arch/arm/boot/Image.gz-dtb ak3/
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3 ak3
+          cp arch/arm/boot/zImage ak3/
           cd ak3
-          zip -r9 ../NetHunter-Potter.zip * \
-            -x .git README.md
+          zip -r9 ../NetHunter-Potter.zip * -x .git README.md
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
