@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -17,7 +17,7 @@ jobs:
         run: |
           sudo apt-get update -y
           sudo apt-get install -y \
-            gcc-arm-linux-gnueabi \
+            gcc-9-arm-linux-gnueabi \
             make bc bison flex \
             libssl-dev libelf-dev \
             build-essential python3 zip
@@ -30,9 +30,9 @@ jobs:
       - name: Build Kernel
         run: |
           export ARCH=arm
-          export CROSS_COMPILE=arm-linux-gnueabi-
-          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- potter_defconfig
-          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- -j$(nproc)
+          export CROSS_COMPILE=arm-linux-gnueabi-9-
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi-9- potter_defconfig
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi-9- -j$(nproc)
 
       - name: Check Boot Output
         run: ls arch/arm/boot/
