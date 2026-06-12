@@ -22,6 +22,14 @@ jobs:
             libssl-dev libelf-dev \
             build-essential python3 zip
 
+      - name: Set GCC 9 as cross compiler
+        run: |
+          sudo update-alternatives --install \
+            /usr/bin/arm-linux-gnueabi-gcc \
+            arm-linux-gnueabi-gcc \
+            /usr/bin/arm-linux-gnueabi-gcc-9 1
+          arm-linux-gnueabi-gcc --version
+
       - name: Patch DTC yylloc
         run: |
           sed -i 's/YYLTYPE yylloc/extern YYLTYPE yylloc/' \
@@ -30,9 +38,9 @@ jobs:
       - name: Build Kernel
         run: |
           export ARCH=arm
-          export CROSS_COMPILE=arm-linux-gnueabi-9-
-          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi-9- potter_defconfig
-          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi-9- -j$(nproc)
+          export CROSS_COMPILE=arm-linux-gnueabi-
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- potter_defconfig
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- -j$(nproc)
 
       - name: Check Boot Output
         run: ls arch/arm/boot/
