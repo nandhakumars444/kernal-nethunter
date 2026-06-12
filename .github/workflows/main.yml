@@ -48,13 +48,9 @@ jobs:
           if grep -q "alias(__stringify(SyS" include/linux/syscalls.h; then
             echo "alias still present - patching now"
             python3 -c "
-import re
 with open('include/linux/syscalls.h', 'r') as f:
     content = f.read()
-content = content.replace(
-    '__attribute__((alias(__stringify(SyS##name))))',
-    ''
-)
+content = content.replace('__attribute__((alias(__stringify(SyS##name))))', '')
 with open('include/linux/syscalls.h', 'w') as f:
     f.write(content)
 print('Done patching syscalls.h')
@@ -62,7 +58,6 @@ print('Done patching syscalls.h')
           else
             echo "GOOD: alias already removed in repo"
           fi
-
       - name: Suppress attribute-alias warnings in Makefiles
         run: |
           echo "KBUILD_CFLAGS += -Wno-attribute-alias" >> arch/arm/Makefile
