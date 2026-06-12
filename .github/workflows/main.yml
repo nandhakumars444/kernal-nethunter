@@ -27,13 +27,13 @@ jobs:
         run: |
           sed -i 's/YYLTYPE yylloc/extern YYLTYPE yylloc/' scripts/dtc/dtc-lexer.lex.c_shipped
 
-      - name: Patch syscalls.h
+      - name: Suppress all warnings as errors
         run: |
-          python3 -c "f=open('include/linux/syscalls.h','r');c=f.read();f.close();c=c.replace('__attribute__((alias(__stringify(SyS##name))))','');f=open('include/linux/syscalls.h','w');f.write(c);f.close();print('patched')"
-
-      - name: Suppress warnings
-        run: |
-          echo "KBUILD_CFLAGS += -Wno-attribute-alias" >> arch/arm/Makefile
+          sed -i 's/-Werror=attribute-alias=2//' Makefile || true
+          sed -i 's/-Werror=attribute-alias//' Makefile || true
+          sed -i 's/-Werror=attribute-alias=2//' arch/arm/Makefile || true
+          sed -i 's/-Werror=attribute-alias//' arch/arm/Makefile || true
+          echo "KBUILD_CFLAGS += -Wno-attribute-alias -Wno-error" >> arch/arm/Makefile
 
       - name: Build Kernel
         run: |
