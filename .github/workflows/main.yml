@@ -38,7 +38,7 @@ jobs:
 
       - name: Verify patches applied in repo
         run: |
-          echo "=== syscalls.h - checking alias is gone ==="
+          echo "=== syscalls.h - checking alias ==="
           grep -n "alias(__stringify" include/linux/syscalls.h || echo "GOOD: alias removed"
           echo "=== proc-v7.S - checking section flags ==="
           grep -n "proc.info.init" arch/arm/mm/proc-v7.S
@@ -48,17 +48,20 @@ jobs:
           if grep -q "alias(__stringify(SyS" include/linux/syscalls.h; then
             echo "alias still present - patching now"
             python3 -c "
-with open('include/linux/syscalls.h', 'r') as f:
-    content = f.read()
+f = open('include/linux/syscalls.h', 'r')
+content = f.read()
+f.close()
 content = content.replace('__attribute__((alias(__stringify(SyS##name))))', '')
-with open('include/linux/syscalls.h', 'w') as f:
-    f.write(content)
+f = open('include/linux/syscalls.h', 'w')
+f.write(content)
+f.close()
 print('Done patching syscalls.h')
 "
           else
             echo "GOOD: alias already removed in repo"
           fi
-      - name: Suppress attribute-alias warnings in Makefiles
+
+      - name: Suppress attribute-alias warnings
         run: |
           echo "KBUILD_CFLAGS += -Wno-attribute-alias" >> arch/arm/Makefile
           grep "attribute-alias" arch/arm/Makefile
