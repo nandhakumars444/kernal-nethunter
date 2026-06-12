@@ -18,10 +18,14 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y \
             gcc-arm-linux-gnueabi \
-            gcc-aarch64-linux-gnu \
             make bc bison flex \
             libssl-dev libelf-dev \
             build-essential python3 zip
+
+      - name: Patch DTC yylloc (GCC compatibility fix)
+        run: |
+          sed -i 's/YYLTYPE yylloc/extern YYLTYPE yylloc/' \
+            scripts/dtc/dtc-lexer.lex.c_shipped
 
       - name: Build Kernel
         run: |
@@ -30,20 +34,12 @@ jobs:
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- potter_defconfig
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- -j$(nproc)
 
-      - name: Check Output
-        run: |
-          echo "Listing boot output:"
-          ls arch/arm/boot/ || echo "Boot folder missing!"
+      - name: Check Boot Output
+        run: ls arch/arm/boot/
 
       - name: Package Kernel
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 ak3
           cp arch/arm/boot/zImage ak3/
           cd ak3
-          zip -r9 ../NetHunter-Potter.zip * -x .git README.md
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: NetHunter-Potter-Kernel
-          path: NetHunter-Potter.zip
+          zip -r9 ../NetHunter-Potter.zip * -x .git REA
