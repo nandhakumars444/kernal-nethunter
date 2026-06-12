@@ -36,34 +36,14 @@ jobs:
           sed -i 's/YYLTYPE yylloc/extern YYLTYPE yylloc/' \
             scripts/dtc/dtc-lexer.lex.c_shipped
 
-      - name: Patch proc-v7.S for modern GAS
+      - name: Patch proc-v7.S section flags
         run: |
-          # Modern GAS rejects # as comment character in ARM ISA lines
-          # Replace lines where # is used as immediate prefix with @
-          sed -i 's/@ #\([0-9]\)/@ $\1/g' arch/arm/mm/proc-v7.S
-          sed -i 's/,\s*#\([0-9]\)/,#\1/g' arch/arm/mm/proc-v7.S
-          # Show line 463-467 so we can verify
-          sed -n '463,467p' arch/arm/mm/proc-v7.S
+          sed -i 's/\.section\s*"\.proc\.info\.init",\s*#alloc,\s*#execinstr/.section ".proc.info.init", %alloc, %execinstr/g' \
+            arch/arm/mm/proc-v7.S
+          grep "proc.info.init" arch/arm/mm/proc-v7.S
 
-      - name: Patch syscalls.h for modern GCC
+      - name: Patch syscalls.h alias warning
         run: |
-          # The .err assembler directive in fork.o is triggered by
-          # __SYSCALL_DEFINEx type checking — disable the error trigger
-          sed -i 's/\bassmlinkage\b/asmlinkage/g' include/linux/syscalls.h || true
-          # Disable -Werror=attribute-alias which causes .err in asm output
-          sed -i 's/-Werror=attribute-alias=2//' Makefile || true
-          sed -i 's/-Werror=attribute-alias//' Makefile || true
-          # Also patch it in arch/arm/Makefile
-          sed -i 's/-Werror=attribute-alias=2//' arch/arm/Makefile || true
-          sed -i 's/-Werror=attribute-alias//' arch/arm/Makefile || true
-
-      - name: Patch kernel fork.c .err trigger
-        run: |
-          # The .err comes from this check in syscalls.h when compiled
-          # with newer GCC — patch it to use __attribute__((alias)) without error
-          sed -i '/__attribute__((error/d' include/linux/syscalls.h || true
-          sed -i '/BUILD_BUG_ON_MSG/d' include/linux/syscalls.h || true
-          # Suppress the specific warning that generates .err in asm
           echo "KBUILD_CFLAGS += -Wno-attribute-alias" >> arch/arm/Makefile
 
       - name: Build Kernel
@@ -81,7 +61,6 @@ jobs:
       - name: Package Kernel
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 ak3
-          # Try zImage first, fall back to zImage-dtb or Image.gz-dtb
           if [ -f arch/arm/boot/zImage ]; then
             cp arch/arm/boot/zImage ak3/
           elif [ -f arch/arm/boot/zImage-dtb ]; then
@@ -89,7 +68,7 @@ jobs:
           elif [ -f arch/arm/boot/Image.gz-dtb ]; then
             cp arch/arm/boot/Image.gz-dtb ak3/
           else
-            echo "ERROR: No kernel image found!"
+            echo "No kernel image found!"
             ls arch/arm/boot/
             exit 1
           fi
