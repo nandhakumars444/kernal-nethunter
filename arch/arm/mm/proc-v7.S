@@ -461,7 +461,8 @@ __v7_setup_stack:
 	string	cpu_arch_name, "armv7"
 	string	cpu_elf_name, "v7"
 	.align
-.section ".proc.info.init", "aw", %progbits
+
+  .section ".proc.info.init", "aw", %progbits
 
 	/*
 	 * Standard v7 proc info content
