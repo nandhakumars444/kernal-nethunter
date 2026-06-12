@@ -47,25 +47,18 @@ jobs:
         run: |
           if grep -q "alias(__stringify(SyS" include/linux/syscalls.h; then
             echo "alias still present - patching now"
-            sed -i '/asmlinkage long sys##name.*alias(__stringify/,/;[[:space:]]*\\/{
-              s/__attribute__((alias(__stringify(SyS##name))))//g
-            }' include/linux/syscalls.h || true
-            # Nuclear option - rewrite the whole macro
-            python3 - <<'EOF'
+            python3 -c "
 import re
-
 with open('include/linux/syscalls.h', 'r') as f:
     content = f.read()
-
-old = r'(__attribute__\(\(alias\(__stringify\(SyS##name\)\)\)\);)'
-new = ';'
-content = re.sub(old, new, content)
-
+content = content.replace(
+    '__attribute__((alias(__stringify(SyS##name))))',
+    ''
+)
 with open('include/linux/syscalls.h', 'w') as f:
     f.write(content)
-
-print("Done patching syscalls.h")
-EOF
+print('Done patching syscalls.h')
+"
           else
             echo "GOOD: alias already removed in repo"
           fi
