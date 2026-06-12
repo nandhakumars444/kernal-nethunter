@@ -36,15 +36,44 @@ jobs:
           sed -i 's/YYLTYPE yylloc/extern YYLTYPE yylloc/' \
             scripts/dtc/dtc-lexer.lex.c_shipped
 
-      - name: Patch proc-v7.S section flags
+      - name: Verify patches applied in repo
         run: |
-          sed -i 's/\.section\s*"\.proc\.info\.init",\s*#alloc,\s*#execinstr/.section ".proc.info.init", %alloc, %execinstr/g' \
-            arch/arm/mm/proc-v7.S
-          grep "proc.info.init" arch/arm/mm/proc-v7.S
+          echo "=== syscalls.h - checking alias is gone ==="
+          grep -n "alias(__stringify" include/linux/syscalls.h || echo "GOOD: alias removed"
+          echo "=== proc-v7.S - checking section flags ==="
+          grep -n "proc.info.init" arch/arm/mm/proc-v7.S
 
-      - name: Patch syscalls.h alias warning
+      - name: Patch syscalls.h if alias still present
+        run: |
+          if grep -q "alias(__stringify(SyS" include/linux/syscalls.h; then
+            echo "alias still present - patching now"
+            sed -i '/asmlinkage long sys##name.*alias(__stringify/,/;[[:space:]]*\\/{
+              s/__attribute__((alias(__stringify(SyS##name))))//g
+            }' include/linux/syscalls.h || true
+            # Nuclear option - rewrite the whole macro
+            python3 - <<'EOF'
+import re
+
+with open('include/linux/syscalls.h', 'r') as f:
+    content = f.read()
+
+old = r'(__attribute__\(\(alias\(__stringify\(SyS##name\)\)\)\);)'
+new = ';'
+content = re.sub(old, new, content)
+
+with open('include/linux/syscalls.h', 'w') as f:
+    f.write(content)
+
+print("Done patching syscalls.h")
+EOF
+          else
+            echo "GOOD: alias already removed in repo"
+          fi
+
+      - name: Suppress attribute-alias warnings in Makefiles
         run: |
           echo "KBUILD_CFLAGS += -Wno-attribute-alias" >> arch/arm/Makefile
+          grep "attribute-alias" arch/arm/Makefile
 
       - name: Build Kernel
         run: |
@@ -52,23 +81,28 @@ jobs:
           export CROSS_COMPILE=arm-linux-gnueabi-
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- potter_defconfig
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- \
-            KCFLAGS="-Wno-attribute-alias -Wno-error" \
+            KCFLAGS="-Wno-attribute-alias -Wno-error -w" \
             -j$(nproc)
 
       - name: Check Boot Output
-        run: ls arch/arm/boot/
+        run: |
+          echo "=== Contents of arch/arm/boot/ ==="
+          ls -la arch/arm/boot/
 
       - name: Package Kernel
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 ak3
           if [ -f arch/arm/boot/zImage ]; then
+            echo "Found zImage"
             cp arch/arm/boot/zImage ak3/
           elif [ -f arch/arm/boot/zImage-dtb ]; then
+            echo "Found zImage-dtb"
             cp arch/arm/boot/zImage-dtb ak3/zImage
           elif [ -f arch/arm/boot/Image.gz-dtb ]; then
+            echo "Found Image.gz-dtb"
             cp arch/arm/boot/Image.gz-dtb ak3/
           else
-            echo "No kernel image found!"
+            echo "ERROR: No kernel image found!"
             ls arch/arm/boot/
             exit 1
           fi
