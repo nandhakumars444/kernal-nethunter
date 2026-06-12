@@ -1,0 +1,116 @@
+name: Build NetHunter Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            gcc-9-arm-linux-gnueabi \
+            binutils-arm-linux-gnueabi \
+            make bc bison flex \
+            libssl-dev libelf-dev \
+            build-essential python3 zip
+
+      - name: Set GCC 9 as cross compiler
+        run: |
+          sudo update-alternatives --install \
+            /usr/bin/arm-linux-gnueabi-gcc \
+            arm-linux-gnueabi-gcc \
+            /usr/bin/arm-linux-gnueabi-gcc-9 1
+          arm-linux-gnueabi-gcc --version
+
+      - name: Patch DTC yylloc
+        run: |
+          sed -i 's/YYLTYPE yylloc/extern YYLTYPE yylloc/' \
+            scripts/dtc/dtc-lexer.lex.c_shipped
+
+      - name: Verify patches applied in repo
+        run: |
+          echo "=== syscalls.h - checking alias is gone ==="
+          grep -n "alias(__stringify" include/linux/syscalls.h || echo "GOOD: alias removed"
+          echo "=== proc-v7.S - checking section flags ==="
+          grep -n "proc.info.init" arch/arm/mm/proc-v7.S
+
+      - name: Patch syscalls.h if alias still present
+        run: |
+          if grep -q "alias(__stringify(SyS" include/linux/syscalls.h; then
+            echo "alias still present - patching now"
+            sed -i '/asmlinkage long sys##name.*alias(__stringify/,/;[[:space:]]*\\/{
+              s/__attribute__((alias(__stringify(SyS##name))))//g
+            }' include/linux/syscalls.h || true
+            # Nuclear option - rewrite the whole macro
+            python3 - <<'EOF'
+import re
+
+with open('include/linux/syscalls.h', 'r') as f:
+    content = f.read()
+
+old = r'(__attribute__\(\(alias\(__stringify\(SyS##name\)\)\)\);)'
+new = ';'
+content = re.sub(old, new, content)
+
+with open('include/linux/syscalls.h', 'w') as f:
+    f.write(content)
+
+print("Done patching syscalls.h")
+EOF
+          else
+            echo "GOOD: alias already removed in repo"
+          fi
+
+      - name: Suppress attribute-alias warnings in Makefiles
+        run: |
+          echo "KBUILD_CFLAGS += -Wno-attribute-alias" >> arch/arm/Makefile
+          grep "attribute-alias" arch/arm/Makefile
+
+      - name: Build Kernel
+        run: |
+          export ARCH=arm
+          export CROSS_COMPILE=arm-linux-gnueabi-
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- potter_defconfig
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- \
+            KCFLAGS="-Wno-attribute-alias -Wno-error -w" \
+            -j$(nproc)
+
+      - name: Check Boot Output
+        run: |
+          echo "=== Contents of arch/arm/boot/ ==="
+          ls -la arch/arm/boot/
+
+      - name: Package Kernel
+        run: |
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3 ak3
+          if [ -f arch/arm/boot/zImage ]; then
+            echo "Found zImage"
+            cp arch/arm/boot/zImage ak3/
+          elif [ -f arch/arm/boot/zImage-dtb ]; then
+            echo "Found zImage-dtb"
+            cp arch/arm/boot/zImage-dtb ak3/zImage
+          elif [ -f arch/arm/boot/Image.gz-dtb ]; then
+            echo "Found Image.gz-dtb"
+            cp arch/arm/boot/Image.gz-dtb ak3/
+          else
+            echo "ERROR: No kernel image found!"
+            ls arch/arm/boot/
+            exit 1
+          fi
+          cd ak3
+          zip -r9 ../NetHunter-Potter.zip * -x .git README.md
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetHunter-Potter-Kernel
+          path: NetHunter-Potter.zip
