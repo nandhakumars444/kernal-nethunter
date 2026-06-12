@@ -1,3 +1,7 @@
+
+#undef __attribute_alias__
+#define __attribute_alias__(x)
+
 /*
  * syscalls.h - Linux syscall interfaces (non-arch-specific)
  *
